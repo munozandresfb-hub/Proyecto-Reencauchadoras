@@ -1,0 +1,19 @@
+Trabajo en un empresa de Reencauchce de llantas, soy el subgerente y me tambien me enfoco en mejorar procesos para que la operacion de la empresa sea mas eficiente. 
+
+Actualmente tenemos un programa en un computador windows ya de unos años atras, en este programa guardamos la informacion de los clientes de la reencauchadora, tenemos datos como: Nombre, numero de celular, direccion, numero de cedula como datos de las llantas que traen al servicio de reencauche, la informacion que almacenamos para inventario e identificar las llantas es: Marca, Dimension, DOT y el diseño que el cliente selecciona para su casco.
+
+El sistema guarda cada llanta con un unico numero de identificación nosotros denominamos tiquete, dentro de este programa podemos ubicar el estado de reencauche que se encuentran las llantas,  tiene diferentes opciones de busqueda, cambio de ubicacion, cambio de tiquetes, ahora te subo una foto para que mires lo que ofrece.
+
+La situacion es que tiene una interfaz poco eficiente para buscar llantas y datos de clientes, se deben abrir y cerrar pestañas continuamente. el objetivo es centralizar toda esta informacion en una pantalla mas agil ganando tiempo de respuesta y orden en nuestras labores.
+
+La informacion que me ahora me arroja una pestaña es: Cantidad de llantas, dimension, DOT, diseño, estado, ubicacion, observacion, fecha de entrada de la llanta y fecha de salida de la llanta. 
+
+La informacion que necesito que se adicione:
+     -Datos del cliente: Numero de celular, numero de cedula, direccion. 
+
+* Informacion financiera: Si la llanta ya esta paga o pendiente de pago, Cual es la deuda total y cual es el total abonado. 
+
+De esta manera podemos ver en una pantalla toda la informacion necesaria del cliente y tener la informacion importante en solo una vista.
+
+Debe actualizarse toda la informacion guardada a este nuevo sistema y toda la nueva informacion entrante ya debe quedar de la nueva forma.
+
