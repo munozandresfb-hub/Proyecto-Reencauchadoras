@@ -1,0 +1,865 @@
+REENCAUCHADORA DELCA SAS
+Especificaciones Técnicas del Sistema
+Versión 2.1 — Documento para Claude Code
+Junio 2025
+ 
+1. DESCRIPCIÓN GENERAL
+
+Sistema de gestión operativa y administrativa de escritorio para Windows. Reemplaza el sistema actual (Visual FoxPro/Access) centralizando el control de llantas, clientes, producción y finanzas en una sola plataforma moderna, robusta y visualmente amigable.
+
+Parámetro	Valor
+Usuarios simultáneos	2-3 en red local (99% uso desde PC principal)
+Sistema operativo	Windows 10 / Windows 11
+Resolución mínima	1366 × 768 px
+Modo de red	SQLite local. Red local vía sesión de usuario remoto si se requiere segundo PC
+2. STACK TECNOLÓGICO
+
+Componente	Tecnología	Justificación
+Lenguaje	Python 3.11+	Estable, amplio ecosistema, multiplataforma
+Interfaz	CustomTkinter 5.x	Moderno, nativo Windows, tema claro/oscuro
+Base de datos	SQLite 3 + SQLAlchemy 2.x + WAL Mode	Local, sin servidor, robusto con WAL para integridad
+Impresión	ReportLab 4.x	Posicionamiento exacto sobre formulario preimpreso
+Íconos	Lucide o FontAwesome TTF	Consistencia visual
+Empaquetado	PyInstaller + archivo .spec personalizado	Genera .exe sin dependencias externas
+Respaldos	Módulo shutil + schedule	Copia automática diaria, retención configurable
+Exportación	pandas + openpyxl	Exportar reportes a Excel/CSV
+Seguridad	bcrypt	Hash de contraseñas, nunca texto plano en BD
+3. ESTRUCTURA DE CARPETAS DEL PROYECTO
+
+delca_sistema/
+├── main.py                    # Punto de entrada — carga login, luego ventana principal
+├── config.py                  # ruta_base(), colores, fuentes, constantes, PERMISOS
+├── requirements.txt
+├── delca.spec                 # Configuración PyInstaller para generar .exe
+├── assets/
+│   ├── logo_delca.png
+│   ├── logo_delca.ico         # Ícono del .exe
+│   ├── fonts/
+│   └── icons/
+├── database/
+│   ├── db.py                  # Conexión SQLAlchemy + activación WAL Mode
+│   ├── models.py              # Modelos ORM (todas las tablas)
+│   ├── migrations.py          # Creación inicial de tablas + datos de prueba
+│   └── backup.py              # Respaldo automático diario
+├── modules/
+│   ├── auth/
+│   │   ├── login_view.py      # Pantalla de login
+│   │   └── gestion_usuarios.py# Crear/editar/desactivar usuarios (solo ADMIN)
+│   ├── ingreso/
+│   │   ├── clientes.py        # Formulario clientes
+│   │   └── llantas.py         # Formulario llantas + vista previa impresión
+│   ├── principal/
+│   │   ├── main_view.py       # Vista principal
+│   │   ├── tabla_llantas.py   # Tabla central con semáforo
+│   │   └── acciones.py        # Modales de acciones rápidas
+│   ├── reportes/
+│   │   ├── reportes_view.py   # Vista contenedor
+│   │   └── generadores.py     # Lógica de cada reporte
+│   ├── metricas/
+│   │   ├── metricas_view.py   # Dashboard KPIs
+│   │   ├── graficas.py        # Gráficas de barras y distribución
+│   │   ├── simulador.py       # Simulador materia prima
+│   │   └── precios.py         # Tabla de precios
+│   └── impresion/
+│       ├── orden_reencauche.py # Impresión REE-F-010
+│       └── calibracion.py      # Configuración de coordenadas (pantalla calibración)
+├── utils/
+│   ├── validaciones.py        # Validadores de campos
+│   ├── exportar.py            # Exportar a Excel/CSV
+│   └── logger.py              # Log de cambios
+└── data/
+    ├── delca.db               # Base de datos principal — NUNCA MOVER NI RENOMBRAR
+    ├── backups/               # Copias automáticas diarias (delca_YYYYMMDD.db)
+    └── logs/                  # Registro de operaciones
+
+4. DISEÑO UI — GUÍA DE ESTILOS
+
+4.1 Paleta de Colores
+Clave	Hex	Uso
+primary	#534AB7	Botones principales, tabs activos
+primary_hover	#3C3489	Hover botones primarios
+primary_light	#EEEDFE	Fondos seleccionados, badges activos
+sem_green	#639922	Semáforo verde — < 3 meses en planta
+sem_yellow	#BA7517	Semáforo amarillo — 3 a 12 meses
+sem_red	#A32D2D	Semáforo rojo — > 12 meses
+estado_pend_bg/tx	#FAEEDA / #854F0B	Badge PENDIENTE
+estado_reenc_bg/tx	#EAF3DE / #3B6D11	Badge REENCAUCHADA
+estado_insp_bg/tx	#E6F1FB / #185FA5	Badge INSPECCIÓN
+estado_rech_bg/tx	#FCEBEB / #A32D2D	Badge RECHAZADA
+fin_ok	#0F6E56	Pagado / positivo
+fin_danger	#A32D2D	Saldo pendiente / negativo
+bg_primary / secondary / tertiary	#FFFFFF / #F5F4F2 / #EEECE8	Fondos de niveles
+border	#E0DDD8	Bordes de cards e inputs
+text_primary / secondary / tertiary	#1A1916 / #6B6860 / #9B9890	Jerarquía de texto
+4.2 Tipografía
+Clave	Definición	Uso
+title	Segoe UI, 15pt, Bold	Títulos de ventana
+subtitle	Segoe UI, 13pt, Bold	Títulos de sección
+body	Segoe UI, 12pt	Texto general
+small	Segoe UI, 11pt	Labels secundarios
+tiny	Segoe UI, 10pt	Etiquetas de campos (MAYÚSCULAS)
+mono	Consolas, 12pt	Tiquetes, números de orden
+kpi	Segoe UI, 24pt, Bold	Números KPI grandes en dashboard
+4.3 Principios de Diseño UI
+• Espaciado generoso: padding mínimo 12px en cards, 8px entre elementos.
+• Bordes sutiles: 1px, color #E0DDD8, radio 8px en cards, 6px en inputs.
+• Sombras suaves: cards con relief=flat + borde, sin sombras pesadas.
+• Estados visuales claros: hover, selected, disabled bien diferenciados.
+• Íconos acompañando texto en todos los botones principales.
+• Feedback inmediato: mensajes de éxito/error en la misma vista, no popups molestos.
+• Confirmaciones solo en acciones destructivas: eliminar, cambiar tiquete, reasignar cliente.
+• Botones restringidos: se muestran en gris/deshabilitados visualmente según el rol del usuario activo — no simplemente bloqueados al hacer clic.
+• Labels de campos siempre en mayúsculas pequeñas (10pt, color text_secondary).
+5. BASE DE DATOS — MODELOS
+
+5.0 Configuración de Conexión (db.py)
+Al iniciar la aplicación, antes de cualquier operación, se deben activar los siguientes PRAGMAs de SQLite:
+from sqlalchemy import create_engine, text
+from config import DB_PATH
+
+engine = create_engine(f'sqlite:///{DB_PATH}', echo=False)
+
+def init_db():
+    with engine.connect() as conn:
+        conn.execute(text('PRAGMA journal_mode=WAL'))      # Escritura segura
+        conn.execute(text('PRAGMA foreign_keys=ON'))       # Integridad referencial
+        conn.execute(text('PRAGMA synchronous=NORMAL'))    # Balance velocidad/seguridad
+        conn.execute(text('PRAGMA cache_size=-64000'))     # Cache 64MB
+        conn.execute(text('PRAGMA temp_store=MEMORY'))     # Temporales en RAM
+        conn.commit()
+5.1 Tabla: clientes
+CREATE TABLE clientes (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre        TEXT NOT NULL,
+    nit_cc        TEXT UNIQUE NOT NULL,
+    telefono      TEXT,
+    direccion     TEXT,
+    correo        TEXT,
+    asesor        TEXT,            -- COM | VEN | DIR
+    tipo          TEXT DEFAULT 'P', -- P=Particular, E=Empresa
+    activo        INTEGER DEFAULT 1,
+    creado_en     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    modificado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_clientes_nit ON clientes(nit_cc);
+CREATE INDEX idx_clientes_nombre ON clientes(nombre);
+5.2 Tabla: llantas
+CREATE TABLE llantas (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    tiquete               TEXT UNIQUE NOT NULL,
+    orden                 TEXT NOT NULL,
+    cliente_id            INTEGER NOT NULL REFERENCES clientes(id),
+    marca                 TEXT,
+    dimension             TEXT,
+    disenio               TEXT,         -- Diseño/Banda
+    dot_serie             TEXT,
+    ubicacion             TEXT DEFAULT 'P',
+    estado                TEXT DEFAULT 'PENDIENTE',
+    -- Estados válidos:
+    -- PENDIENTE | INSPECCION_INICIAL | EN_PROCESO |
+    -- INSPECCION_FINAL | REENCAUCHADA | RECHAZADA | REPARADA
+    causa_rechazo_id      INTEGER REFERENCES causas_rechazo(id),
+    -- Obligatorio cuando estado = RECHAZADA
+    resolucion_inspeccion TEXT,
+    prioridad             INTEGER DEFAULT 2,
+    valor_servicio        REAL,
+    observacion           TEXT,
+    fecha_entrada         DATE NOT NULL,
+    fecha_salida          DATE,
+    mes_procesado         INTEGER,
+    anio_procesado        INTEGER,
+    costo_kg              REAL,
+    doc_salida            TEXT,
+    creado_en             TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    modificado_en         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_llantas_cliente ON llantas(cliente_id);
+CREATE INDEX idx_llantas_estado  ON llantas(estado);
+CREATE INDEX idx_llantas_fecha   ON llantas(fecha_entrada);
+CREATE INDEX idx_llantas_orden   ON llantas(orden);
+5.3 Tabla: causas_rechazo
+Contiene los códigos y descripciones oficiales de causa de rechazo de la inspección. Se cargan como datos iniciales al crear la base de datos.
+CREATE TABLE causas_rechazo (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    codigo  TEXT UNIQUE NOT NULL,   -- Código numérico o letra (ej: '1', 'A', '41')
+    causa   TEXT NOT NULL,          -- Descripción completa
+    activo  INTEGER DEFAULT 1       -- Permite desactivar sin borrar
+);
+Datos iniciales — INSERT al crear la BD:
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('A', 'APTA PARA REENCAUCHE');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('1', 'LONAS O CINTURONES EXPUESTOS');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('2', 'SEPARACION DE LONAS EN CORONA');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('3', 'SEPARACION DE LONAS EN COSTADO');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('4', 'SOPLADA EN LOS HOMBROS');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('5', 'REPARACION CERCA A LA PESTAÑA');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('6', 'PESTAÑA DETERIORADA');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('7', 'ALAMBRES DE PESTAÑA EXPUESTOS');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('8', 'DOS REPARACIONES JUNTAS');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('9', 'REPARACION FUERA DEL LIMITE');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('10', 'LLANTA DEMASIADO GASTADA');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('11', 'CONTAMINADA');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('12', 'CORTES RADIALES');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('13', 'CORTES CIRCUNFERENCIALES');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('14', 'GRIETAS EN LOS COSTADOS');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('16', 'LINER DETERIORADO');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('18', 'NO HAY BANDA');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('19', 'RODADA CON BAJA PRESION');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('20', 'EXESO DE PONCHADURAS');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('21', 'DEMASIADO PICADA');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('22', 'SEPARACION ENTRE CINTURONES');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('23', 'MISCELANEOS');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('24', 'SOPLADA EN EL LINER');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('25', 'GRIETAS EN LOS HOMBROS');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('26', 'RODADA CON SOBRECARGA');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('27', 'UNION O EMPALME ABIERTO');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('28', 'OXIDACION 4TO CINTURON');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('29', 'HOMBRO MUY CAIDO');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('30', 'LAMINACION');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('31', 'COSTADO ABIERTO');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('32', 'SOPLADA EN LA PESTAÑA');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('33', 'DESPRENDIMIENTO DE HILOS');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('34', 'CRISTALIZADA');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('35', 'MOTIVOS ADMINISTRATIVOS');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('36', 'REENCAUCHE MOLDEADO');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('37', 'SIN SERIE');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('38', 'LINER CRISTALIZADO');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('39', 'COSTADO DEFORMADO');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('40', 'COSTADO DETERIORADO');
+INSERT INTO causas_rechazo(codigo, causa) VALUES ('41', 'POROCIDAD');
+5.4 Tabla: pagos
+CREATE TABLE pagos (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    cliente_id  INTEGER NOT NULL REFERENCES clientes(id),
+    llanta_id   INTEGER REFERENCES llantas(id),  -- Opcional: abono específico a una llanta
+    valor       REAL NOT NULL,
+    fecha       DATE NOT NULL,
+    observacion TEXT,
+    usuario     TEXT NOT NULL,  -- Usuario que registró el abono (solo ADMIN)
+    creado_en   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_pagos_cliente ON pagos(cliente_id);
+5.5 Tabla: precios
+CREATE TABLE precios (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    dimension     TEXT NOT NULL,
+    disenio       TEXT NOT NULL,
+    precio        REAL NOT NULL,
+    UNIQUE(dimension, disenio),
+    modificado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+5.6 Tabla: metas
+CREATE TABLE metas (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    meta_llantas_mes      INTEGER DEFAULT 60,
+    punto_equilibrio      INTEGER DEFAULT 40,
+    meta_ingresos_mes     REAL    DEFAULT 25000000,
+    valor_promedio_llanta REAL    DEFAULT 414000,
+    modificado_en         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+-- Solo puede ser modificada por ADMIN
+5.7 Tabla: historial_cambios (auditoría)
+CREATE TABLE historial_cambios (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    tabla         TEXT NOT NULL,
+    registro_id   INTEGER NOT NULL,
+    campo         TEXT NOT NULL,
+    valor_antes   TEXT,
+    valor_despues TEXT,
+    usuario       TEXT NOT NULL,
+    fecha         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_historial_tabla ON historial_cambios(tabla, registro_id);
+CREATE INDEX idx_historial_fecha ON historial_cambios(fecha);
+5.8 Tabla: materia_prima
+CREATE TABLE materia_prima (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    dimension       TEXT NOT NULL,
+    disenio         TEXT NOT NULL,
+    peso_banda_kg   REAL NOT NULL,
+    peso_cushion_kg REAL NOT NULL,
+    UNIQUE(dimension, disenio)
+);
+5.9 Tabla: usuarios
+CREATE TABLE usuarios (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    username            TEXT UNIQUE NOT NULL,
+    password_hash       TEXT NOT NULL,     -- bcrypt, NUNCA texto plano
+    rol                 TEXT NOT NULL,     -- 'ADMIN' o 'USUARIO'
+    pregunta_seguridad  TEXT,
+    respuesta_hash      TEXT,              -- bcrypt
+    activo              INTEGER DEFAULT 1,
+    creado_en           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+-- Datos iniciales:
+-- ADMIN: usuario='admin', contraseña='delca2025' (cambiar en primer uso)
+-- La contraseña inicial se debe cambiar obligatoriamente al primer login
+6. MÓDULOS — ESPECIFICACIÓN DETALLADA
+
+6.0 Autenticación y Roles
+Pantalla de Login
+• Campos: Usuario y Contraseña (entrada tipo password, botón mostrar/ocultar).
+• Botón 'Iniciar sesión' — valida contra BD, carga permisos en sesión activa.
+• Botón 'Olvidé mi contraseña' — muestra pregunta de seguridad → si responde correctamente → permite establecer nueva contraseña.
+• Primer login del admin: el sistema detecta que la contraseña es la inicial ('delca2025') y obliga a cambiarla antes de continuar.
+• 3 intentos fallidos seguidos → bloqueo de 60 segundos con contador visible.
+• La sesión se mantiene activa mientras la aplicación esté abierta (no hay timeout automático).
+• El nombre y rol del usuario activo se muestran en la esquina superior derecha de la topbar.
+• Botón 'Cerrar sesión' en la topbar — regresa a la pantalla de login sin cerrar la aplicación.
+Roles y Permisos
+Acción	ADMIN	USUARIO
+Ver KPI / Dashboard métricas	✅	✅ (solo lectura)
+Editar metas y KPI	✅	❌
+Ver información financiera clientes	✅	✅
+Agregar / editar abonos	✅ único	❌
+Modificar precio de servicio	✅ único	❌
+Modificar tabla de precios	✅ único	❌
+Eliminar tiquete	✅ único	❌
+Agregar llanta / tiquete	✅	✅
+Editar marca, banda, serie, dimensión	✅	✅
+Cambiar estado de llanta	✅	✅
+Agregar / editar clientes	✅	✅
+Generar reportes	✅	✅
+Buscar cualquier registro	✅	✅
+Gestionar usuarios (crear/desactivar)	✅ único	❌
+Ver historial de cambios	✅	❌
+
+Implementación en código — decorador de permiso para cada función restringida:
+# config.py
+PERMISOS = {
+    'ADMIN': ['ver_kpi','editar_kpi','editar_metas','ver_financiero',
+              'agregar_abono','editar_abono','editar_precio_cliente',
+              'editar_precio_servicio','eliminar_tiquete','editar_tiquete',
+              'agregar_llanta','editar_llanta','agregar_cliente','editar_cliente',
+              'generar_reportes','ver_historial','gestionar_usuarios'],
+    'USUARIO': ['ver_kpi','agregar_llanta','editar_llanta',
+                'agregar_cliente','editar_cliente',
+                'generar_reportes','editar_tiquete'],
+}
+
+# En cada función restringida:
+def btn_agregar_abono_click():
+    if not sesion.tiene_permiso('agregar_abono'):
+        return  # El botón ya está visualmente deshabilitado; esto es segunda capa
+    # ... lógica normal
+6.1 Topbar (Componente Global)
+• Logo Delca — lado izquierdo.
+• Buscador central con selector de tipo: nombre / cédula-NIT / tiquete / orden / dimensión.
+• 4 botones de navegación: Principal · Ingreso · Reportes · Métricas — tab activo resaltado en morado.
+• Lado derecho: nombre del usuario activo + rol + botón 'Cerrar sesión'.
+6.2 Módulo Ingreso
+Formulario Clientes
+Campo	Obligatorio	Notas
+Nombre completo	Sí	
+NIT / Cédula	Sí	Único, validación en tiempo real
+Teléfono / Celular	Sí	
+Asesor	Sí	Select: COM | VEN | DIR
+Dirección	No	
+Tipo	Sí	P-Particular / E-Empresa
+Correo	No	Validar formato email
+Comportamiento: al escribir 3+ caracteres en el buscador, carga el cliente si existe (modo EDICIÓN) o habilita creación (modo CREACIÓN). Botón Guardar deshabilitado hasta que campos obligatorios estén completos.
+Formulario Llantas
+Campo	Obligatorio	Notas
+N° Tiquete	Sí	Único, solo alfanumérico
+N° Orden	Sí	Puede repetirse (una orden = varios tiquetes)
+Cliente	Sí	Vinculado al módulo de clientes
+Fecha entrada	Sí	No puede ser fecha futura
+Marca	Sí	
+Dimensión	Sí	Al seleccionar dim+diseño autocompleta precio
+Diseño / Banda	Sí	
+Ubicación inicial	Sí	
+DOT / Serie	No	
+Valor servicio	No	Autocompletado desde tabla precios
+Prioridad	No	Default 2
+Observación	No	
+Comportamiento especial: vista previa de la orden en tiempo real (lado derecho). Botón 'Guardar e imprimir' y botón 'Solo guardar'. Precio se autocompleta al seleccionar Dimensión + Diseño desde tabla precios (solo ADMIN puede modificarlo luego).
+6.3 Módulo Principal
+Tabla Central de Llantas
+Columnas: semáforo | tiquete | orden | tiempo | marca | dimensión | diseño | estado | ubicación | pago
+Semáforo de tiempo en planta:
+  • Verde: fecha_entrada hace menos de 90 días
+  • Amarillo: 90 a 365 días en planta
+  • Rojo: más de 365 días en planta
+Acciones Rápidas (modal por llanta seleccionada)
+Acción	Rol mínimo	Detalle
+Cambiar estado	USUARIO	Select con estados válidos + observación opcional. Si estado = RECHAZADA: campo causa de rechazo OBLIGATORIO (select desde tabla causas_rechazo, filtrado solo causas activas, excluye código A)
+Cambiar ubicación	USUARIO	Select ubicaciones + fecha cambio
+Registrar abono	ADMIN	Valor, fecha, observación. Muestra saldo actual del cliente
+Registrar salida	USUARIO	Estado al salir, fecha, destino
+Asignar valor llanta	ADMIN	Valor manual o desde tabla de precios
+Editar datos llanta	USUARIO/ADMIN	USUARIO: marca, banda, serie, dimensión, DOT, ubicación, observación. ADMIN: todo lo anterior más cliente (reasignar), tiquete, orden, valor servicio
+Eliminar tiquete	ADMIN	Confirmación con contraseña. Registra en historial_cambios
+6.4 Módulo Reportes
+Menú lateral izquierdo. Cada reporte tiene filtros en la parte superior, tabla de resultados donde CADA LLANTA OCUPA SU PROPIA FILA (sin agrupación), y botones Exportar Excel / Imprimir al final.
+Reporte	Filtros disponibles	Columnas principales
+Llantas en planta	cliente, orden, dimensión, marca, estado	semáforo, tiquete, orden, cliente, tel, marca, dim, diseño, estado, ubic, tiempo en planta
+Por cliente	nombre o NIT	tiquete, orden, marca, dim, diseño, estado, ubic, tiempo
+Por marca	marca, estado	marca, cantidad, %, pendientes, reencauchadas
+Por dimensión	dimensión	dimensión, en planta, %, pendientes, reencauchadas
+Por diseño/banda	diseño	diseño, en planta, %, dimensión más común
+Reencauches mes	mes, año, tipo	dimensión, diseño, cantidad, % mes, valor
+Reencauches año	año	mes, llantas, % meta, ingresos
+Producción general	año, dimensión, marca	totales, tasa rechazo, días promedio, barras participación
+Causas de rechazo	mes, año, estado	código, causa, cantidad, %, cliente, tiquete
+Encabezado de todos los reportes imprimibles: REENCAUCHADORA DELCA SAS · NIT · Fecha de impresión · Nombre del reporte.
+6.5 Módulo Métricas
+Solo el ADMIN puede editar metas y valores. El USUARIO puede ver todos los KPI y gráficas en modo lectura.
+• KPIs del mes: 4 tarjetas (llantas producidas, cumplimiento %, ingresos, tasa rechazo). 3 barras de progreso (llantas vs meta, ingresos vs meta, punto de equilibrio).
+• Producción: gráfica de barras últimos 6 meses (verde≥meta, amarillo cerca, rojo bajo). 2 distribuciones: por dimensión y por banda.
+• Financiero: grid 6 meses + resumen acumulado anual. ADMIN accede a detalle completo.
+• Simulador materia prima: sliders KG banda/cushion por referencia → resultado automático llantas posibles.
+• Tabla de precios: CRUD completo (solo ADMIN). Campo precio editable inline.
+• Configurar metas: solo ADMIN. Vista previa de KPIs con nuevos valores antes de guardar.
+6.6 Módulo Impresión — REE-F-010
+Formulario físico: media hoja carta (21.6 cm × 14 cm), orientación horizontal.
+Campo	X (mm)	Y (mm)	Fuente
+TIQUETE SUPERIOR (desprendible)			
+Cliente top	5	8	9pt
+Tiquete top	5	20	11pt bold
+Dimensión top	35	20	9pt
+Diseño top	75	20	9pt
+O.S. top	5	30	9pt
+Serie top	35	30	9pt
+HOJA DE PROCESO (parte inferior)			
+Cliente	5	52	9pt
+Tiquete	5	63	11pt bold
+Dimensión	35	63	9pt
+Marca	75	63	9pt
+Diseño	5	74	9pt
+Serie	35	74	9pt
+Fecha	75	74	9pt
+O.S.	5	85	9pt
+Observación	35	85	8pt
+Pantalla de Calibración: ajuste de cada coordenada con flechas +/- de 0.5mm. Configuración guardada en BD tabla config_impresion. Los cambios en calibración NO requieren permisos de ADMIN (cualquier usuario puede calibrar).
+Código de impresión base
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import mm
+import subprocess, os
+
+def imprimir_orden(datos, coords):
+    tmp = os.path.join(BASE_DIR, 'data', 'orden_temp.pdf')
+    c = canvas.Canvas(tmp, pagesize=(216*mm, 140*mm))
+    c.setFont('Helvetica-Bold', 11)
+    c.drawString(coords['tiquete_x']*mm, coords['tiquete_y']*mm, datos['tiquete'])
+    # ... resto de campos según tabla de coordenadas
+    c.save()
+    subprocess.run(['start', '/wait', '', tmp], shell=True)
+7. ROBUSTEZ Y SEGURIDAD DE DATOS
+
+7.1 Verificación de integridad al iniciar
+def verificar_integridad_bd():
+    """Se ejecuta en main.py antes de mostrar el login."""
+    with engine.connect() as conn:
+        resultado = conn.execute(text('PRAGMA integrity_check')).fetchone()
+        if resultado[0] != 'ok':
+            mostrar_alerta_critica(
+                'La base de datos tiene un problema de integridad.\n'
+                'No abra el programa hasta consultar con soporte técnico.\n'
+                f'Detalle: {resultado[0]}'
+            )
+            sys.exit(1)
+7.2 Patrón de operaciones (todas las escrituras)
+def guardar_llanta(datos):
+    try:
+        with db.session.begin():
+            llanta = Llanta(**datos)
+            db.session.add(llanta)
+        mostrar_exito('Llanta guardada correctamente')
+    except IntegrityError:
+        mostrar_error('El tiquete ya existe en el sistema')
+    except Exception as e:
+        mostrar_error('Error inesperado. Los datos no fueron modificados.')
+        logger.error(f'Error guardar_llanta: {e}')
+7.3 Sistema de respaldo automático
+La BD principal (delca.db) NUNCA se borra ni se modifica por el proceso de backup. Los backups son COPIAS adicionales independientes.
+# config.py
+BACKUP_DIAS_RETENER = 30   # Ajustable según necesidad
+
+# database/backup.py
+def backup_diario():
+    """Se ejecuta al iniciar la app, una vez por día."""
+    origen  = DB_PATH                     # data/delca.db — INTACTO
+    fecha   = datetime.now().strftime('%Y%m%d')
+    destino = os.path.join(BACKUP_DIR, f'delca_{fecha}.db')
+
+    if not os.path.exists(destino):       # Solo una copia por día
+        shutil.copy2(origen, destino)
+        logger.info(f'Backup creado: {destino}')
+
+    # Limpiar copias más antiguas que BACKUP_DIAS_RETENER
+    # (solo borra las COPIAS, nunca delca.db)
+    archivos = sorted(glob.glob(os.path.join(BACKUP_DIR, 'delca_*.db')))
+    while len(archivos) > BACKUP_DIAS_RETENER:
+        os.remove(archivos.pop(0))
+        logger.info(f'Backup antiguo eliminado: {archivos[0]}')
+7.4 Validaciones obligatorias
+Campo	Validación
+Tiquete	Único, solo alfanumérico, no vacío
+NIT/CC	Único por cliente
+Fecha entrada	No puede ser futura para registros nuevos
+Valor servicio	Solo números positivos
+Estado RECHAZADA	Obligatorio seleccionar causa_rechazo_id
+Contraseña	Mínimo 6 caracteres
+Campos obligatorios	UI bloquea guardado, resalta borde en rojo
+8. ARCHIVO config.py — CONTENIDO COMPLETO
+
+import sys, os
+
+# ── RUTAS ── (funciona tanto en desarrollo como en .exe empaquetado)
+def ruta_base():
+    if getattr(sys, 'frozen', False):   # Corriendo como .exe
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+BASE_DIR   = ruta_base()
+DB_PATH    = os.path.join(BASE_DIR, 'data', 'delca.db')
+BACKUP_DIR = os.path.join(BASE_DIR, 'data', 'backups')
+LOG_DIR    = os.path.join(BASE_DIR, 'data', 'logs')
+ASSETS_DIR = os.path.join(BASE_DIR, 'assets')
+
+# Crear carpetas si no existen
+for d in [os.path.dirname(DB_PATH), BACKUP_DIR, LOG_DIR]:
+    os.makedirs(d, exist_ok=True)
+
+# ── APP ──
+APP_NAME    = 'Sistema Delca SAS'
+VERSION     = '1.0.0'
+BACKUP_DIAS_RETENER = 30
+
+# ── COLORES ──
+COLORS = {
+    'primary':        '#534AB7',
+    'primary_hover':  '#3C3489',
+    'primary_light':  '#EEEDFE',
+    'sem_green':      '#639922',
+    'sem_yellow':     '#BA7517',
+    'sem_red':        '#A32D2D',
+    'estado_pend_bg': '#FAEEDA', 'estado_pend_tx': '#854F0B',
+    'estado_reenc_bg':'#EAF3DE', 'estado_reenc_tx':'#3B6D11',
+    'estado_insp_bg': '#E6F1FB', 'estado_insp_tx': '#185FA5',
+    'estado_rech_bg': '#FCEBEB', 'estado_rech_tx': '#A32D2D',
+    'fin_ok':         '#0F6E56',
+    'fin_danger':     '#A32D2D',
+    'fin_warn':       '#854F0B',
+    'bg_primary':     '#FFFFFF',
+    'bg_secondary':   '#F5F4F2',
+    'bg_tertiary':    '#EEECE8',
+    'border':         '#E0DDD8',
+    'text_primary':   '#1A1916',
+    'text_secondary': '#6B6860',
+    'text_tertiary':  '#9B9890',
+}
+
+# ── TIPOGRAFÍA ──
+FONTS = {
+    'title':    ('Segoe UI', 15, 'bold'),
+    'subtitle': ('Segoe UI', 13, 'bold'),
+    'body':     ('Segoe UI', 12),
+    'small':    ('Segoe UI', 11),
+    'tiny':     ('Segoe UI', 10),
+    'mono':     ('Consolas', 12),
+    'kpi':      ('Segoe UI', 24, 'bold'),
+}
+
+# ── ESTADOS LLANTAS ──
+ESTADOS_LLANTA = [
+    'PENDIENTE', 'INSPECCION_INICIAL', 'EN_PROCESO',
+    'INSPECCION_FINAL', 'REENCAUCHADA', 'RECHAZADA', 'REPARADA'
+]
+
+# ── PERMISOS POR ROL ──
+PERMISOS = {
+    'ADMIN': ['ver_kpi','editar_kpi','editar_metas','ver_financiero',
+              'agregar_abono','editar_abono','editar_precio_cliente',
+              'editar_precio_servicio','eliminar_tiquete','editar_tiquete',
+              'agregar_llanta','editar_llanta','agregar_cliente','editar_cliente',
+              'generar_reportes','ver_historial','gestionar_usuarios'],
+    'USUARIO': ['ver_kpi','agregar_llanta','editar_llanta',
+                'agregar_cliente','editar_cliente',
+                'generar_reportes','editar_tiquete'],
+}
+9. EMPAQUETADO — ARCHIVO delca.spec
+
+Este archivo va en la carpeta raíz del proyecto. Garantiza que PyInstaller incluya todos los assets necesarios, especialmente los de CustomTkinter que no se incluyen automáticamente.
+# delca.spec
+import customtkinter, os
+
+ct_path = os.path.dirname(customtkinter.__file__)
+
+a = Analysis(
+    ['main.py'],
+    pathex=[],
+    binaries=[],
+    datas=[
+        (ct_path, 'customtkinter'),    # Assets CustomTkinter (tema, íconos)
+        ('assets', 'assets'),          # Logo, fuentes, íconos propios
+        ('data', 'data'),              # Carpeta BD y backups
+    ],
+    hiddenimports=[
+        'customtkinter',
+        'PIL._tkinter_finder',
+        'reportlab.graphics',
+        'sqlalchemy.dialects.sqlite',
+        'bcrypt',
+    ],
+    hookspath=[],
+    runtime_hooks=[],
+    excludes=[],
+)
+pyz = PYZ(a.pure)
+exe = EXE(
+    pyz, a.scripts, a.binaries, a.zipfiles, a.datas,
+    name='DelcaSistema',
+    debug=False,
+    strip=False,
+    upx=True,
+    console=False,              # Sin ventana negra de consola
+    icon='assets/logo_delca.ico',
+)
+Comando para generar el .exe (ejecutar desde la carpeta raíz del proyecto):
+pyinstaller delca.spec
+10. MIGRACIÓN DE DATOS
+
+10.1 Estados — Tabla de equivalencias
+Confirmar con el sistema FoxPro/Access los estados actuales y mapearlos a los estados del nuevo sistema antes de ejecutar la migración:
+Estado en sistema viejo	Estado en sistema nuevo	Acción
+[Completar con sistema viejo]	PENDIENTE	Mapear directamente
+[Completar con sistema viejo]	REENCAUCHADA	Mapear directamente
+[Completar con sistema viejo]	RECHAZADA	Mapear + asignar causa_rechazo_id
+SOPLADA (si existe)	RECHAZADA	Mapear + causa: según código
+Cualquier otro	[Definir]	Evaluar caso a caso
+10.2 Script de migración
+import pandas as pd
+from database.models import Cliente, Llanta
+from database.db import engine
+
+def migrar_desde_excel(archivo_clientes, archivo_llantas, mapa_estados):
+    """
+    mapa_estados: dict {'ESTADO_VIEJO': 'ESTADO_NUEVO', ...}
+    Se ejecuta UNA SOLA VEZ. Registra cada operación en el log.
+    """
+    errores = []
+    importados = 0
+
+    df_clientes = pd.read_excel(archivo_clientes)
+    for _, row in df_clientes.iterrows():
+        try:
+            # Validar campos obligatorios antes de insertar
+            # Insertar en BD
+            importados += 1
+        except Exception as e:
+            errores.append({'fila': _, 'error': str(e), 'datos': row.to_dict()})
+
+    # Guardar log de errores
+    if errores:
+        pd.DataFrame(errores).to_excel('migracion_errores.xlsx', index=False)
+
+    print(f'Importados: {importados} | Errores: {len(errores)}')
+    return importados, errores
+10.3 Pasos del proceso de corte
+Paso 1 — Exportar del sistema actual a Excel/CSV: clientes y llantas/tiquetes.
+Paso 2 — Verificar que todos los campos requeridos estén presentes en el export.
+Paso 3 — Ejecutar script de migración en entorno de prueba primero.
+Paso 4 — Verificar conteos: clientes totales, llantas totales, llantas por estado.
+Paso 5 — Verificar 10-20 registros manualmente al azar.
+Paso 6 — Día de corte: último día usando sistema viejo.
+Paso 7 — Día siguiente: sistema nuevo en producción.
+Paso 8 — Sistema viejo disponible solo-lectura por 30 días adicionales.
+12. CATÁLOGOS — DIMENSIONES, MARCAS Y VALORES DE REFERENCIA
+
+Los catálogos reemplazan los campos de texto libre en el formulario de llantas. El usuario selecciona desde un desplegable en lugar de escribir, eliminando errores de tipeo que afectan reportes y métricas.
+El ADMIN puede agregar, editar o desactivar valores de catálogo en cualquier momento desde Herramientas > Catálogos, sin necesidad de intervención técnica. Esto cubre el caso diario de cascos con marcas o dimensiones nuevas que llegan a planta.
+12.1 Tabla: catalogos
+CREATE TABLE catalogos (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    tipo      TEXT NOT NULL,
+    -- Tipos válidos:
+    -- 'DIMENSION'  — ej: 295/80R22.5, 11R22.5, 275/80R22.5
+    -- 'MARCA'      — ej: Bridgestone, Michelin, Goodyear, Continental
+    -- 'DISENIO'    — ej: VZY2, PBA60, REP, ST
+    -- 'UBICACION'  — ej: Planta, Bodega, Despacho, Entregada
+    -- 'ASESOR'     — ej: COM, VEN, DIR
+    valor     TEXT NOT NULL,
+    activo    INTEGER DEFAULT 1,
+    creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(tipo, valor)
+);
+CREATE INDEX idx_catalogos_tipo ON catalogos(tipo, activo);
+12.2 Pantalla de gestión de catálogos (Herramientas > Catálogos)
+Solo disponible para ADMIN. Interfaz con pestañas por tipo de catálogo:
+Pestaña	Comportamiento
+Dimensiones	Lista de dimensiones activas. Botón '+ Agregar dimensión' abre campo inline. Botón desactivar en cada fila (no elimina, marca activo=0 para conservar historial).
+Marcas	Lista de marcas activas. Misma lógica. Al desactivar una marca, las llantas históricas la conservan.
+Diseños/Bandas	Lista de diseños activos. Vinculado a tabla precios y materia_prima.
+Ubicaciones	Ubicaciones de planta disponibles.
+Asesores	Códigos de asesor (COM, VEN, DIR, etc.).
+12.3 Integración con formularios
+Todos los desplegables de los formularios de llantas y clientes se alimentan dinámicamente desde la tabla catalogos filtrando por tipo y activo=1. Al agregar un valor nuevo en Herramientas > Catálogos, queda disponible de inmediato en todos los formularios sin reiniciar la aplicación.
+# Ejemplo: cargar dimensiones para desplegable
+def cargar_dimensiones():
+    with db.session() as s:
+        return [r.valor for r in
+                s.query(Catalogo)
+                 .filter_by(tipo='DIMENSION', activo=1)
+                 .order_by(Catalogo.valor).all()]
+13. MÓDULO DE NOTIFICACIONES AUTOMÁTICAS
+
+El sistema queda arquitecturado para integrarse de manera ágil con cualquier proveedor de mensajería (Twilio SMS, Twilio Voice, WhatsApp Business API, Make + Twilio). El proveedor específico se define e implementa en una fase posterior. Todo el código del núcleo del sistema es independiente del proveedor.
+13.1 Principio de diseño — Arquitectura abierta
+La capa de envío está aislada detrás de una interfaz abstracta (NotificadorBase). Agregar un nuevo proveedor en el futuro significa crear un archivo nuevo que implemente esa interfaz, sin tocar ningún otro módulo del sistema.
+# modules/notificaciones/base.py
+class NotificadorBase:
+    """
+    Interfaz que debe implementar cualquier proveedor de notificaciones.
+    Al integrar Twilio, WhatsApp Business, Make u otro,
+    se crea una clase que hereda de esta y se registra en config.py.
+    """
+    def enviar_sms(self, telefono: str, mensaje: str) -> dict:
+        raise NotImplementedError
+
+    def enviar_whatsapp(self, telefono: str, mensaje: str) -> dict:
+        raise NotImplementedError
+
+    def iniciar_llamada(self, telefono: str, audio_url: str) -> dict:
+        raise NotImplementedError
+
+
+# Al momento de integrar Twilio, se crea:
+# modules/notificaciones/twilio_notificador.py
+# class TwilioNotificador(NotificadorBase): ...
+
+# Al momento de integrar WhatsApp Business:
+# modules/notificaciones/whatsapp_notificador.py
+# class WhatsAppNotificador(NotificadorBase): ...
+
+# En config.py se activa el proveedor:
+# NOTIFICADOR_ACTIVO = 'twilio'  # o 'whatsapp' o 'make'
+13.2 Tablas de base de datos
+-- Configuración del proveedor activo (solo ADMIN puede editar)
+CREATE TABLE config_notificaciones (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    proveedor       TEXT DEFAULT 'pendiente',
+    -- Valores: 'twilio_sms' | 'twilio_voice' | 'whatsapp_business' | 'make' | 'pendiente'
+    api_key         TEXT,           -- Encriptado en BD
+    api_secret      TEXT,           -- Encriptado en BD
+    numero_origen   TEXT,           -- Número desde el que se envía
+    webhook_url     TEXT,           -- Para Make/Zapier si aplica
+    activo          INTEGER DEFAULT 0,  -- 0 hasta que se configure el proveedor
+    modificado_en   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Registro de todas las notificaciones generadas y su estado
+CREATE TABLE notificaciones (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    tipo            TEXT NOT NULL,
+    -- 'SEMAFORO_AMARILLO' | 'SEMAFORO_ROJO' | 'LLANTA_LISTA' | 'CLIENTE_INACTIVO'
+    cliente_id      INTEGER NOT NULL REFERENCES clientes(id),
+    llanta_id       INTEGER REFERENCES llantas(id),  -- NULL para notif. de cliente
+    telefono        TEXT NOT NULL,
+    mensaje         TEXT,           -- Texto generado (se define al integrar proveedor)
+    estado          TEXT DEFAULT 'PENDIENTE',
+    -- 'PENDIENTE' | 'ENVIADO' | 'FALLIDO' | 'CANCELADO'
+    proveedor_usado TEXT,
+    respuesta_api   TEXT,           -- JSON de respuesta del proveedor
+    generado_por    TEXT,           -- Usuario que generó el lote
+    creado_en       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    enviado_en      TIMESTAMP
+);
+CREATE INDEX idx_notif_cliente ON notificaciones(cliente_id);
+CREATE INDEX idx_notif_tipo    ON notificaciones(tipo);
+CREATE INDEX idx_notif_estado  ON notificaciones(estado);
+13.3 Flujo de notificaciones — Semáforo de llantas
+Disparador: el sistema detecta llantas con semáforo amarillo (90-365 días) o rojo (>365 días) que no han recibido notificación en los últimos 30 días.
+Flujo de trabajo del usuario:
+Paso	Acción del sistema	Acción del usuario
+1	Genera lista de clientes candidatos	Usuario abre Notificaciones > Semáforo desde el menú
+2	Muestra reporte previo con todos los candidatos	Revisa la lista: cliente, teléfono, tiquete, días en planta, semáforo
+3	—	Si desea excluir algún cliente: selecciona la fila y pulsa botón 'Quitar de este envío' — el cliente no recibe notificación en este lote pero sigue en futuros
+4	—	Pulsa 'Confirmar y enviar' con la lista final depurada
+5	Registra cada notificación en tabla notificaciones con estado PENDIENTE	—
+6	Ejecuta envíos vía proveedor configurado	Ve progreso en pantalla: X enviados, Y fallidos
+7	Actualiza estado a ENVIADO o FALLIDO según respuesta API	Puede reenviar los fallidos con un clic
+13.4 Flujo de notificaciones — Clientes inactivos
+Disparador: clientes cuya última llanta registrada tiene fecha_entrada mayor a UMBRAL_INACTIVIDAD_DIAS (default 365, configurable por ADMIN).
+Flujo idéntico al de semáforo con estos datos adicionales en el reporte previo:
+• Cliente — nombre y NIT/CC
+• Teléfono — para contacto directo
+• Asesor asignado — COM/VEN/DIR
+• Última llanta — fecha de la última entrada registrada
+• Días inactivo — calculado desde última entrada a hoy
+• Total llantas históricas — para dimensionar el cliente
+
+El reporte de clientes inactivos también está disponible en Módulo Reportes como reporte independiente (exportable a Excel) sin necesidad de ejecutar notificaciones.
+13.5 Pantalla principal del módulo (Herramientas > Notificaciones)
+Sección	Contenido
+Estado del proveedor	Badge verde/rojo indicando si hay proveedor configurado. Botón 'Configurar' (solo ADMIN).
+Semáforo amarillo	Cantidad de clientes candidatos. Botón 'Ver reporte y enviar'.
+Semáforo rojo	Cantidad de clientes candidatos. Botón 'Ver reporte y enviar'.
+Llantas listas	Llantas en estado REENCAUCHADA sin notificación de retiro. Botón 'Ver reporte y enviar'.
+Clientes inactivos	Clientes sin actividad > umbral configurado. Botón 'Ver reporte y enviar'.
+Historial de envíos	Tabla con todos los envíos: fecha, tipo, cliente, estado, proveedor. Filtros por fecha y estado.
+13.6 Configuración del proveedor (ADMIN)
+Pantalla accesible desde Herramientas > Notificaciones > Configurar. Campos:
+• Proveedor activo: select (Twilio SMS / Twilio Voice / WhatsApp Business / Make+Twilio / Sin configurar)
+• Account SID / API Key: campo de texto, valor se guarda encriptado
+• Auth Token / API Secret: campo de texto, valor se guarda encriptado
+• Número de origen: número desde el que se envían mensajes
+• Webhook URL: para integraciones con Make o Zapier
+• Umbral inactividad clientes (días): default 365, editable
+• Días entre notificaciones del mismo cliente: default 30 (evita spam)
+• Botón 'Probar conexión': envía un mensaje de prueba al número del ADMIN
+13.7 Estructura de carpetas — módulo notificaciones
+modules/notificaciones/
+├── __init__.py
+├── base.py                  # Clase abstracta NotificadorBase
+├── notificaciones_view.py   # Pantalla principal del módulo
+├── reporte_previo.py        # Vista de reporte con botón 'Quitar' por fila
+├── historial_view.py        # Historial de envíos con filtros
+├── config_view.py           # Formulario configuración proveedor (ADMIN)
+├── generador_lotes.py       # Lógica para construir lotes de candidatos
+└── proveedores/             # Un archivo por proveedor al momento de integrar
+    ├── __init__.py
+    ├── twilio_sms.py        # class TwilioSMS(NotificadorBase)     — fase 2
+    ├── twilio_voice.py      # class TwilioVoice(NotificadorBase)   — fase 2
+    ├── whatsapp_business.py # class WhatsAppBusiness(NotificadorBase) — fase 2
+    └── make_webhook.py      # class MakeWebhook(NotificadorBase)   — fase 2
+13.8 Permisos del módulo de notificaciones
+Acción	ADMIN	USUARIO
+Ver pantalla de notificaciones	✅	✅
+Generar reporte previo y enviar lote	✅	✅
+Quitar clientes del reporte previo	✅	✅
+Ver historial de envíos	✅	✅
+Configurar proveedor y credenciales	✅ único	❌
+Cambiar umbral de inactividad	✅ único	❌
+11. INSTRUCCIONES PARA CLAUDE CODE (ACTUALIZADO v2.1)
+
+11.1 Orden de construcción
+#	Módulo	Detalle
+1	Base de datos	models.py + migrations.py + causas_rechazo + catalogos + tablas notificaciones + datos de prueba
+2	Config global	config.py con ruta_base(), colores, fuentes, PERMISOS, ESTADOS_LLANTA, NOTIFICADOR_ACTIVO='pendiente'
+3	Auth	login_view.py + gestion_usuarios.py + sesion activa
+4	Ventana principal	main.py + topbar + navegación entre módulos
+5	Módulo Ingreso	Clientes + llantas con desplegables desde tabla catalogos
+6	Módulo Principal	Tabla semáforo + panel cliente + acciones + modal rechazo con causa
+7	Módulo Reportes	9 reportes + reporte clientes inactivos
+8	Módulo Métricas	KPIs + gráficas + simulador + precios + metas
+9	Catálogos	Herramientas > Catálogos — CRUD dimensiones/marcas/diseños/ubicaciones
+10	Notificaciones	Módulo completo con arquitectura base + pantallas + historial. Proveedor='pendiente'
+11	Impresión	Calibración + generación PDF + envío a impresora Windows
+12	Robustez	Validaciones, errores, backups, auditoría, verificación integridad
+13	Empaquetado	delca.spec + prueba .exe en máquina limpia
+11.2 Datos de prueba a incluir
+• 10 clientes de ejemplo (mezcla tipo P y E, distintos asesores).
+• 30-40 llantas en diferentes estados y fechas variadas (semáforo verde/amarillo/rojo).
+• Llantas rechazadas con diferentes causas de rechazo asignadas.
+• 2 clientes con última llanta hace más de 365 días (para probar reporte inactivos).
+• 5 notificaciones de prueba en historial (enviadas y fallidas) para probar la vista.
+• Catálogos pre-cargados: 10 dimensiones, 10 marcas, 5 diseños, 4 ubicaciones comunes.
+• 5 meses de historial para métricas con tendencias visibles.
+• Precios para las 4 combinaciones más comunes de dimensión+diseño.
+• Metas configuradas con valores reales de operación.
+• 2 usuarios: admin (contraseña: delca2025) y usuario1 (contraseña: user2025).
+11.3 Comando de inicio para Claude Code
+Pegar este mensaje al iniciar la sesión en Claude Code:
+Construye el sistema de gestión de escritorio para la Reencauchadora Delca SAS según el documento ESPECIFICACIONES_DELCA_v2.1.docx adjunto.  Empieza por: 1. Crear la estructura de carpetas completa (incluye modules/notificaciones/proveedores/) 2. Instalar dependencias: customtkinter, sqlalchemy, reportlab, pandas, openpyxl, pillow, bcrypt, schedule, requests 3. Construir config.py con ruta_base(), colores, fuentes, PERMISOS, ESTADOS_LLANTA, NOTIFICADOR_ACTIVO='pendiente' 4. Construir la base de datos: todos los modelos, WAL mode, causas_rechazo, catalogos, tablas notificaciones, datos de prueba 5. Construir módulo de autenticación (login + sesión + roles) 6. Construir main.py con ventana principal y navegación 7. Construir módulo a módulo según orden de la Sección 11.1  Reglas de diseño UI: - Espaciado generoso, tipografía Segoe UI, colores de la guía de estilos - Íconos en todos los botones principales - Botones restringidos visualmente deshabilitados (gris) según rol del usuario activo - Desplegables de dimensión/marca/diseño/ubicación alimentados desde tabla catalogos - Módulo notificaciones: construir arquitectura completa con NotificadorBase y pantallas, proveedor activo='pendiente' hasta fase de integración - Construir módulo por módulo, ejecutar y verificar antes de continuar
+
+REENCAUCHADORA DELCA SAS — Especificaciones Técnicas v2
